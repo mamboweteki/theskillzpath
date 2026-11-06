@@ -69,6 +69,7 @@ export function CheckoutForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("Zimbabwe");
   const [city, setCity] = useState("");
@@ -93,6 +94,10 @@ export function CheckoutForm() {
       setError("Please enter a valid phone number including country code.");
       return;
     }
+    if (password && password.length < 8) {
+      setError("Use an account password with at least 8 characters.");
+      return;
+    }
     if (!agreeTerms) {
       setError("You must accept the founding member terms to continue.");
       return;
@@ -108,6 +113,7 @@ export function CheckoutForm() {
         body: JSON.stringify({
           name: `${firstName.trim()} ${lastName.trim()}`.trim(),
           email: email.trim(),
+          password: password.trim() || undefined,
           phone: phone.trim(),
           country,
           city: city.trim(),
@@ -202,6 +208,7 @@ export function CheckoutForm() {
             {field("lastName", "Last name *", lastName, setLastName, { required: true, placeholder: "Moyo", autoComplete: "family-name" })}
           </div>
           {field("email", "Email address *", email, setEmail, { type: "email", required: true, placeholder: "you@email.com", autoComplete: "email", hint: "Your receipt and launch reminder will be sent here." })}
+          {field("password", "Create a password (optional)", password, setPassword, { type: "password", placeholder: "At least 8 characters", autoComplete: "new-password", hint: "Only needed if you have not created an account yet. It lets you sign in after paying." })}
           {field("phone", "Phone / WhatsApp number *", phone, setPhone, { type: "tel", required: true, placeholder: "+263 77 123 4567", autoComplete: "tel", hint: "Needed for launch updates via WhatsApp." })}
           <div className="grid gap-3.5 sm:grid-cols-2">
             {selectField("country", "Country *", country, setCountry, COUNTRIES_VALUE, true)}

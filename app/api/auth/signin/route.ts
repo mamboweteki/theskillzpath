@@ -28,7 +28,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 422 });
   }
 
-  const member = getMemberByEmail(email);
+  let member;
+  try {
+    member = getMemberByEmail(email);
+  } catch (error) {
+    console.error("[auth] signin database error:", error);
+    return NextResponse.json(
+      { error: "Sign in is temporarily unavailable. Please try again." },
+      { status: 500 },
+    );
+  }
 
   if (!member) {
     return NextResponse.json(
@@ -38,7 +47,9 @@ export async function POST(request: Request) {
   }
 
   const password = typeof payload.password === "string" ? payload.password : "";
-  const passwordValid = member.passwordHash ? verifyPassword(member.passwordHash, password) : false;
+  const passwordValid = member.passwordHash
+    ? verifyPassword(password, member.passwordHash)
+    : false;
 
   if (!passwordValid) {
     return NextResponse.json(

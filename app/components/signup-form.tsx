@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, LockKeyhole } from "lucide-react";
 import { categories } from "@/lib/courses";
 import { site } from "@/lib/site";
 
@@ -16,12 +16,26 @@ export function SignupForm() {
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [interest, setInterest] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (status === "loading") return;
+
+    if (password.length < 8) {
+      setStatus("error");
+      setError("Choose a password with at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setStatus("error");
+      setError("The two passwords do not match.");
+      return;
+    }
 
     setStatus("loading");
     setError("");
@@ -30,7 +44,7 @@ export function SignupForm() {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, email, interest }),
+        body: JSON.stringify({ firstName, email, interest, password }),
       });
       const data: { error?: string } = await response.json().catch(() => ({}));
 
@@ -38,7 +52,9 @@ export function SignupForm() {
         throw new Error(data.error ?? "Something went wrong. Try again.");
       }
 
-      router.push("/dashboard");
+      // Accounts start as reserved, so the next step is payment.
+      router.push("/enroll");
+      router.refresh();
     } catch (submitError) {
       setStatus("error");
       setError(submitError instanceof Error ? submitError.message : "Something went wrong. Try again.");
@@ -102,6 +118,43 @@ export function SignupForm() {
         </select>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="signup-password" className={labelClass}>
+            Password
+          </label>
+          <input
+            id="signup-password"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="signup-confirmPassword" className={labelClass}>
+            Confirm password
+          </label>
+          <input
+            id="signup-confirmPassword"
+            name="confirmPassword"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Repeat your password"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
       {status === "error" ? (
         <p className="text-[12.5px] text-red-600" role="alert">
           {error}
@@ -126,8 +179,10 @@ export function SignupForm() {
         )}
       </button>
 
-      <p className="text-center text-[11.5px] text-[#8b90a3]">
-        Your founding seat is reserved. The founding price of ${site.pricing.earlyBird} locks in at launch.
+      <p className="flex items-start justify-center gap-1.5 text-center text-[11.5px] leading-relaxed text-[#8b90a3]">
+        <LockKeyhole className="mt-0.5 size-3.5 shrink-0" />
+        Your seat is reserved now. The ${site.pricing.earlyBird} founding price is
+        locked in at launch.
       </p>
     </form>
   );

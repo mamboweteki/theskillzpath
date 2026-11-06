@@ -98,6 +98,7 @@ export function Hero() {
                 alt=""
                 fill
                 priority
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 26rem"
                 className="object-cover"
               />
             </div>

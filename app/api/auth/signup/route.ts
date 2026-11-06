@@ -33,18 +33,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 422 });
   }
 
-  if (!password) {
-    return NextResponse.json({ error: "Password is required." }, { status: 422 });
+  if (password.length < 8) {
+    return NextResponse.json(
+      { error: "Use a password with at least 8 characters." },
+      { status: 422 },
+    );
   }
 
-  const member = saveMember({
-    email,
-    firstName,
-    interest,
-    password,
-    paymentStatus: "PENDING",
-    accessStatus: "RESERVED",
-  });
+  let member;
+  try {
+    member = saveMember({
+      email,
+      firstName,
+      interest,
+      password,
+      paymentStatus: "PENDING",
+      accessStatus: "RESERVED",
+    });
+  } catch (error) {
+    console.error("[auth] signup database error:", error);
+    return NextResponse.json(
+      { error: "We could not create your account right now. Please try again." },
+      { status: 500 },
+    );
+  }
 
   if (!member) {
     return NextResponse.json({ error: "Could not create your account." }, { status: 500 });

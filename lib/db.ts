@@ -1,5 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { site } from "./site";
 
 /**
@@ -12,14 +15,64 @@ import { site } from "./site";
  *  - waitlist: email-only early-access reservations collected before launch
  */
 
-const DATABASE_PATH = process.env.DATABASE_PATH ?? "data/skillzpath.db";
-
 let db: DatabaseSync | null = null;
+let dbPath: string | null = null;
 
-function getDb(): DatabaseSync {
-  if (db) return db;
+/**
+ * Serverless platforms (Vercel included) mount the project directory
+ * read-only and only allow writes inside the OS temp directory. We therefore
+ * try the configured path first and fall back to the temp directory instead of
+ * throwing "unable to open database file" at request time.
+ */
+function candidateDatabasePaths(): string[] {
+  const configured = process.env.DATABASE_PATH?.trim();
+  const home = path.join(os.homedir(), ".skillzpath", "skillzpath.db");
+  const temp = path.join(os.tmpdir(), "skillzpath.db");
+  const candidates = configured ? [configured] : [home];
+  candidates.push(temp);
+  return Array.from(new Set(candidates));
+}
 
-  const database = new DatabaseSync(DATABASE_PATH);
+function resolveDatabasePath(): string {
+  for (const candidate of candidateDatabasePaths()) {
+    const absolute = path.isAbsolute(candidate)
+      ? candidate
+      : path.join(/*turbopackIgnore: true*/ process.cwd(), candidate);
+    try {
+      const directory = path.dirname(absolute);
+      fs.mkdirSync(directory, { recursive: true });
+      fs.accessSync(directory, fs.constants.W_OK);
+      return absolute;
+    } catch {
+      // Directory is missing or read-only. Try the next candidate.
+    }
+  }
+  // The temp directory is always writable on supported hosts.
+  return path.join(os.tmpdir(), "skillzpath.db");
+}
+
+function ensureColumn(
+  database: DatabaseSync,
+  table: string,
+  column: string,
+  definition: string,
+): void {
+  const columns = database
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as Record<string, unknown>[];
+  const exists = columns.some((entry) => String(entry.name) === column);
+  if (!exists) {
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function migrate(database: DatabaseSync): void {
+  // Databases created before password sign in existed are missing this column.
+  ensureColumn(database, "members", "password_hash", "TEXT NOT NULL DEFAULT ''");
+}
+
+function openDatabase(absolutePath: string): DatabaseSync {
+  const database = new DatabaseSync(absolutePath);
   database.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -53,9 +106,46 @@ function getDb(): DatabaseSync {
       created_at TEXT NOT NULL
     );
   `);
+  migrate(database);
+  return database;
+}
 
-  db = database;
-  return db;
+function getDb(): DatabaseSync {
+  if (db) return db;
+
+  const errors: string[] = [];
+  for (const candidate of candidateDatabasePaths()) {
+    const absolute = path.isAbsolute(candidate)
+      ? candidate
+      : path.join(/*turbopackIgnore: true*/ process.cwd(), candidate);
+    try {
+      fs.mkdirSync(path.dirname(absolute), { recursive: true });
+      fs.accessSync(path.dirname(absolute), fs.constants.W_OK);
+      const database = openDatabase(absolute);
+      db = database;
+      dbPath = absolute;
+      return db;
+    } catch (error) {
+      errors.push(`${absolute}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const fallback = resolveDatabasePath();
+  try {
+    const database = openDatabase(fallback);
+    db = database;
+    dbPath = fallback;
+    return db;
+  } catch (error) {
+    errors.push(`${fallback}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  throw new Error(`Unable to open the SkillzPath database. ${errors.join(" | ")}`);
+}
+
+export function getDatabasePath(): string {
+  if (!dbPath) getDb();
+  return dbPath ?? path.join(os.tmpdir(), "skillzpath.db");
 }
 
 export type MemberStatus = "PENDING" | "PAID" | "FAILED";
@@ -156,9 +246,6 @@ export function saveMember(input: SaveMemberInput): Member | null {
   const now = new Date().toISOString();
   const email = input.email.trim().toLowerCase();
 
-  // Hash password if provided
-  const passwordHash = input.password ? hashPassword(input.password) : "";
-
   function sanitizeText(value: string, max = 160): string {
     // Strip HTML tags and control chars before persisting free-text fields.
     // React already escapes on render; this is defense-in-depth server-side.
@@ -180,6 +267,11 @@ export function saveMember(input: SaveMemberInput): Member | null {
     const amountPaid = input.amountPaid ?? Number(member.amount_paid ?? 0);
     const agreeUpdates =
       input.agreeUpdates ?? Number(member.agree_updates ?? 1) === 1;
+    // Never wipe an existing password when a later step (for example a
+    // payment) updates the profile without sending one again.
+    const passwordHash = input.password
+      ? hashPassword(input.password)
+      : String(member.password_hash ?? "");
 
     database
       .prepare(
@@ -227,7 +319,7 @@ export function saveMember(input: SaveMemberInput): Member | null {
          email, first_name, last_name, phone, country, city, age_group, interest,
          experience, goal, source, agree_updates, payment_status, access_status,
          amount_paid, reference_number, password_hash, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       email,

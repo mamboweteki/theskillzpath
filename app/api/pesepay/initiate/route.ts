@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     email?: string;
     name?: string;
     amount?: number;
+    password?: string;
     phone?: string;
     country?: string;
     city?: string;
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       goal: body.goal ?? "",
       source: body.source ?? "",
       agreeUpdates: body.agreeUpdates ?? true,
+      password: body.password?.trim() || undefined,
       paymentStatus: "PENDING",
       accessStatus: "RESERVED",
       amountPaid: 0,
@@ -103,12 +105,13 @@ export async function POST(request: Request) {
     return res;
   } catch (error) {
     console.error("[pesepay] initiate error:", error);
+    const message = error instanceof Error ? error.message : "";
+    const databaseProblem = /database|sqlite|EROFS|EACCES|ENOENT/i.test(message);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to initiate payment.",
+        error: databaseProblem
+          ? "We could not start checkout right now. Please try again in a moment."
+          : message || "Failed to initiate payment.",
       },
       { status: 500 },
     );
