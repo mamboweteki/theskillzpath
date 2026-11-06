@@ -1,7 +1,7 @@
 export const site = {
   name: "SkillzPath",
   domain: "skillzpath.com",
-  email: "hello@skillzpath.com",
+  email: "theskillzpath@gmail.com",
   tagline: "Learn skills. Build your future.",
   description:
     "SkillzPath is a practical online skills academy. One monthly membership gives you every published course, portfolio projects, and access to a moderated marketplace of real client opportunities. The campus opens fully on November 17, 2026.",

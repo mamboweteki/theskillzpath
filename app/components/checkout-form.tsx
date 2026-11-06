@@ -209,7 +209,7 @@ export function CheckoutForm() {
           </div>
           {field("email", "Email address *", email, setEmail, { type: "email", required: true, placeholder: "you@email.com", autoComplete: "email", hint: "Your receipt and launch reminder will be sent here." })}
           {field("password", "Create a password (optional)", password, setPassword, { type: "password", placeholder: "At least 8 characters", autoComplete: "new-password", hint: "Only needed if you have not created an account yet. It lets you sign in after paying." })}
-          {field("phone", "Phone / WhatsApp number *", phone, setPhone, { type: "tel", required: true, placeholder: "+263 77 123 4567", autoComplete: "tel", hint: "Needed for launch updates via WhatsApp." })}
+          {field("phone", "Phone / WhatsApp number *", phone, setPhone, { type: "tel", required: true, placeholder: "+263 79 030 0777", autoComplete: "tel", hint: "Needed for launch updates via WhatsApp." })}
           <div className="grid gap-3.5 sm:grid-cols-2">
             {selectField("country", "Country *", country, setCountry, COUNTRIES_VALUE, true)}
             {field("city", "City / Town", city, setCity, { placeholder: "Harare", autoComplete: "address-level2" })}
