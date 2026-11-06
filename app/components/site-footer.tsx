@@ -10,6 +10,7 @@ const columns = [
       { href: "/learn-to-earn", label: "Learn to earn" },
       { href: "/#how-it-works", label: "How it works" },
       { href: "/#membership", label: "Membership" },
+      { href: "https://wa.me/+263790300777", label: "WhatsApp" },
     ],
   },
   {
